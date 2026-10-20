@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+# live-site backend (pokerpatio.com) — drives the system chromium via CDP
+playwright>=1.40

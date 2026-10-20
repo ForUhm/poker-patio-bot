@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Poker Patio · Bot Control</title>
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">♠</div>
+    <div>
+      <h1>POKER PATIO <span>// BOT CONTROL</span></h1>
+      <p class="sub" id="adapter-line">adapter: checking…</p>
+    </div>
+  </div>
+  <div class="topstats">
+    <div class="pill" id="conn-pill"><i class="dot"></i><span>connecting</span></div>
+    <div class="pill" id="sim-pill">sim: idle</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= LIVE SITE (pokerpatio.com) ================= -->
+  <section class="panel live-site">
+    <div class="panel-head">
+      <h2>Poker Patio — live session</h2>
+      <div class="live-status">
+        <span class="pill" id="live-pill"><i class="dot"></i><span>not connected</span></span>
+        <span class="muted small" id="live-mode-label">https://pokerpatio.com</span>
+      </div>
+    </div>
+
+    <div class="live-grid">
+      <form class="live-form" id="live-form" autocomplete="off" onsubmit="return false;">
+        <div class="field">
+          <label for="lv-mode">Table</label>
+          <select id="lv-mode">
+            <option value="singleplayer">Play vs site bots (no login)</option>
+            <option value="public">Public tables (login required)</option>
+          </select>
+        </div>
+
+        <div class="field login-only">
+          <label for="lv-email">Email</label>
+          <input id="lv-email" type="email" autocomplete="username" placeholder="you@example.com" />
+        </div>
+        <div class="field login-only">
+          <label for="lv-password">Password</label>
+          <input id="lv-password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+
+        <div class="field sp-only">
+          <label for="lv-username">Screen name</label>
+          <input id="lv-username" type="text" value="patiobot" maxlength="12" />
+        </div>
+        <div class="field sp-only">
+          <label for="lv-difficulty">Bot difficulty</label>
+          <select id="lv-difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard" disabled>Hard (site: coming soon)</option>
+          </select>
+        </div>
+
+        <div class="field pub-only wide">
+          <label for="lv-table">Table
+            <span class="muted" id="lv-table-age">click ↻ to load</span>
+          </label>
+          <div class="select-row">
+            <select id="lv-table">
+              <option value="">— load the lobby —</option>
+            </select>
+            <button class="btn ghost tiny" id="lv-refresh" type="button" title="Reload the table list">↻</button>
+          </div>
+          <div class="table-info" id="lv-table-info"></div>
+        </div>
+
+        <div class="field pub-only">
+          <label for="lv-buyin">Buy-in</label>
+          <select id="lv-buyin">
+            <option value="min">Min</option>
+            <option value="avg" selected>Average (site default)</option>
+            <option value="max">Max</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="lv-stop">Stop loss <span class="muted">(chips)</span></label>
+          <input id="lv-stop" type="number" value="400" min="0" step="50" />
+        </div>
+        <div class="field">
+          <label for="lv-opp">Opponent range <span class="muted">(%)</span></label>
+          <input id="lv-opp" type="number" value="55" min="5" max="100" step="5" />
+        </div>
+        <div class="field check">
+          <label class="inline"><input id="lv-dry" type="checkbox" checked /> Dry run (log only, no clicks)</label>
+          <label class="inline"><input id="lv-remember" type="checkbox" checked /> Remember this login until I log out</label>
+        </div>
+
+        <div class="field actions-field">
+          <button class="btn primary" id="lv-connect" type="button">Connect &amp; play</button>
+          <button class="btn ghost" id="lv-disconnect" type="button">Disconnect</button>
+          <button class="btn danger" id="lv-logout" type="button">Log out</button>
+        </div>
+        <div class="vault-line" id="lv-vault">no saved login</div>
+        <p class="creds-note">
+          Credentials are sent once to this local server, held in RAM for the session,
+          never written to disk and never returned by the API. For public tables the bot
+          logs in as you and joins the table you name.
+        </p>
+      </form>
+
+      <div class="live-view">
+        <div class="live-kpis">
+          <div class="kpi"><span class="kpi-label">Decisions</span><b id="lv-dec">0</b></div>
+          <div class="kpi"><span class="kpi-label">Hands (est.)</span><b id="lv-hands">0</b></div>
+          <div class="kpi"><span class="kpi-label">Net chips</span><b id="lv-net">0</b></div>
+          <div class="kpi"><span class="kpi-label">Stack</span><b id="lv-stack">—</b></div>
+          <div class="kpi"><span class="kpi-label">Table resets</span><b id="lv-resets">0</b></div>
+          <div class="kpi"><span class="kpi-label">Elapsed</span><b id="lv-elapsed">0s</b></div>
+        </div>
+        <div class="shot-wrap">
+          <img id="lv-shot" alt="live table screenshot" />
+          <div class="shot-empty" id="lv-shot-empty">no browser session</div>
+        </div>
+        <div class="live-feed" id="lv-feed"><div class="muted small">waiting for the first decision…</div></div>
+        <div class="muted small" id="lv-messages"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LEFT: control ================= -->
+  <section class="panel controls">
+    <h2>Strategy</h2>
+    <div class="strategy-grid" id="strategy-grid"></div>
+
+    <h2>Pace</h2>
+    <div class="rate-row">
+      <input type="range" id="rate" min="6" max="300" step="6" value="60" />
+      <output id="rate-out">60 hands/min</output>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="btn-start">▶ Start bot</button>
+      <button class="btn" id="btn-pause">⏸ Pause</button>
+      <button class="btn danger" id="btn-stop">■ Stop</button>
+      <button class="btn ghost" id="btn-reset">↺ Reset</button>
+    </div>
+
+    <h2>Session</h2>
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-label">Hands</span><b id="k-hands">0</b></div>
+      <div class="kpi"><span class="kpi-label">Net chips</span><b id="k-net">0</b></div>
+      <div class="kpi"><span class="kpi-label">bb / 100</span><b id="k-bb100">0</b></div>
+      <div class="kpi"><span class="kpi-label">Win rate</span><b id="k-win">0%</b></div>
+      <div class="kpi"><span class="kpi-label">Showdown</span><b id="k-sd">—</b></div>
+      <div class="kpi"><span class="kpi-label">Rebuys</span><b id="k-rebuy">0</b></div>
+    </div>
+
+    <h2>Adapter</h2>
+    <div class="adapter-box">
+      <div id="adapter-detail" class="muted small">…</div>
+      <button class="btn ghost tiny" id="btn-probe">Copy DOM probe script</button>
+    </div>
+  </section>
+
+  <!-- ================= CENTER: table + decision ================= -->
+  <section class="panel table-panel">
+    <div class="panel-head">
+      <h2>Live table</h2>
+      <span class="muted small" id="table-meta">hand #0</span>
+    </div>
+    <div class="felt-wrap">
+      <div class="felt">
+        <div class="pot-chip" id="pot">pot 0</div>
+        <div class="board" id="board"></div>
+        <div class="street-badge" id="street-badge">—</div>
+      </div>
+      <div class="seat" data-seat="0" id="seat0"></div>
+      <div class="seat" data-seat="1" id="seat1"></div>
+      <div class="seat" data-seat="2" id="seat2"></div>
+      <div class="seat" data-seat="3" id="seat3"></div>
+      <div class="seat" data-seat="4" id="seat4"></div>
+      <div class="seat" data-seat="5" id="seat5"></div>
+    </div>
+
+    <div class="decision" id="decision">
+      <div class="decision-head">
+        <h3>Last decision</h3>
+        <span class="tags" id="dec-tags"></span>
+      </div>
+      <p class="rationale" id="dec-rationale">Waiting for the first hand…</p>
+      <div class="meters">
+        <div class="meter"><label>Equity</label><div class="bar"><i id="m-eq"></i></div><out id="m-eq-v">—</out></div>
+        <div class="meter"><label>Required</label><div class="bar"><i class="req" id="m-req"></i></div><out id="m-req-v">—</out></div>
+        <div class="meter"><label>MDF floor</label><div class="bar"><i class="mdf" id="m-mdf"></i></div><out id="m-mdf-v">—</out></div>
+      </div>
+    </div>
+
+    <div class="feed-wrap">
+      <h3>Hand feed</h3>
+      <div class="feed" id="feed"><div class="muted small">no hands yet</div></div>
+    </div>
+  </section>
+
+  <!-- ================= RIGHT: live performance ================= -->
+  <section class="panel live-perf">
+    <div class="panel-head">
+      <h2>Performance</h2>
+      <span class="muted small" id="chart-meta">live session</span>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><h3>Live bankroll</h3><span class="muted small" id="live-net">0 chips</span></div>
+      <svg id="chart-live" viewBox="0 0 360 170" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><h3>Chips won vs lost</h3><span class="muted small">live</span></div>
+      <svg id="chart-wonlost" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><h3>Action mix (live)</h3><span class="muted small" id="live-af">AF —</span></div>
+      <svg id="chart-live-actions" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
+    </div>
+  </section>
+
+  <!-- ================= FULL WIDTH: strategy comparison ================= -->
+  <section class="panel compare">
+    <div class="panel-head">
+      <h2>Strategy comparison</h2>
+      <span class="muted small">batch simulation · every number below comes from played hands</span>
+    </div>
+    <div class="sim-controls">
+      <label>Hands <input type="number" id="sim-hands" value="400" min="50" max="5000" step="50" /></label>
+      <label>Seed <input type="number" id="sim-seed" placeholder="random" /></label>
+      <label>Equity iters <input type="number" id="sim-iters" value="45" min="20" max="220" step="5" /></label>
+      <button class="btn primary" id="btn-sim">Run 3-strategy sim</button>
+    </div>
+    <div class="progress"><i id="sim-progress"></i></div>
+    <div class="muted small" id="sim-status">idle</div>
+
+    <div class="chart-card wide">
+      <div class="chart-title"><h3>Bankroll by strategy</h3><span class="muted small">cumulative chips</span></div>
+      <svg id="chart-cmp" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-cmp"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="chart-card">
+        <div class="chart-title"><h3>Won / lost / net</h3></div>
+        <svg id="chart-net" viewBox="0 0 470 220" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><h3>Rate stats</h3></div>
+        <svg id="chart-rates" viewBox="0 0 470 220" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><h3>Max drawdown</h3></div>
+        <svg id="chart-dd" viewBox="0 0 470 220" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><h3>Action mix</h3></div>
+        <svg id="chart-actions" viewBox="0 0 470 220" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <div class="chart-card wide">
+      <div class="chart-title"><h3>Profit by position</h3><span class="muted small">chips</span></div>
+      <svg id="chart-pos" viewBox="0 0 1000 260" preserveAspectRatio="none"></svg>
+      <div class="legend" id="legend-pos"></div>
+    </div>
+
+    <div class="chart-card wide">
+      <div class="chart-title"><h3>Summary table</h3><span class="muted small">per strategy</span></div>
+      <div class="table-wrap"><table id="sim-table"></table></div>
+    </div>
+  </section>
+
+  <!-- ================= BOTTOM: range grid + theory ================= -->
+  <section class="panel ranges">
+    <div class="panel-head">
+      <h2>Opening range</h2>
+      <div class="seg" id="range-seg"></div>
+    </div>
+    <div class="range-grid" id="range-grid"></div>
+    <p class="muted small" id="range-meta"></p>
+  </section>
+
+  <section class="panel theory">
+    <h2>Why the strategies differ</h2>
+    <div class="table-wrap"><table id="theory-table"></table></div>
+    <h2 class="section-title">Math used by the engine</h2>
+    <div class="formula-grid" id="formulas"></div>
+  </section>
+</main>
+
+<footer>
+  <span>Poker Patio Bot Control · local engine · no funds at risk</span>
+  <span id="footer-adapter"></span>
+</footer>
+
+<script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
